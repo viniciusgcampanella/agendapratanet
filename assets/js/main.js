@@ -7,6 +7,7 @@ const teams = [
 const storageKey = "agendapratanet-orders";
 const historyKey = "agendapratanet-history";
 const periods = { morning: "Manha · 08:00 - 12:00", afternoon: "Tarde · 13:00 - 18:00" };
+const maxOrdersPerPeriod = 3;
 const today = new Date();
 const toISODate = (date) => { const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, "0"); const day = String(date.getDate()).padStart(2, "0"); return `${year}-${month}-${day}`; };
 const formatDate = (date) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(`${date}T12:00:00`));
@@ -29,7 +30,31 @@ function renderTeams() {
 	$("#order-team").innerHTML = teams.map((team) => `<option value="${team.name}">${team.name}</option>`).join("");
 }
 function getAvailablePeriods(team, date) {
-	return Object.keys(periods).filter((period) => !orders.some((order) => order.team === team && order.date === date && order.period === period));
+	return Object.keys(periods).filter((period) => getAvailableTeams(date, period).some((item) => item.name === team));
+}
+function getAvailableTeams(date, period) {
+	const periodOrders = orders.filter((order) => order.date === date && order.period === period);
+	if (periodOrders.length >= maxOrdersPerPeriod) return [];
+	return teams.filter((team) => !periodOrders.some((order) => order.team === team.name));
+}
+function updateDateAvailability() {
+	const date = $("#order-date").value;
+	const nextPeriod = Object.keys(periods).find((period) => getAvailableTeams(date, period).length);
+	const card = $("#date-availability");
+	card.classList.remove("hidden");
+	if (!nextPeriod) {
+		$("#next-slot-value").textContent = "Nenhum horario disponivel";
+		$("#available-teams-label").textContent = "Os dois periodos ja atingiram o limite de 3 ordens ou nao possuem equipe livre.";
+		$("#order-period").innerHTML = '<option value="">Nenhum periodo livre</option>';
+		$("#availability-message").textContent = `Limite de ${maxOrdersPerPeriod} ordens atingido nos periodos disponiveis.`;
+		return;
+	}
+	const nextTeams = getAvailableTeams(date, nextPeriod);
+	$("#order-team").value = nextTeams[0].name;
+	$("#order-period").value = nextPeriod;
+	$("#next-slot-value").textContent = periods[nextPeriod];
+	$("#available-teams-label").textContent = `Equipes livres: ${nextTeams.map((team) => team.name).join(", ")}.`;
+	updateAvailability();
 }
 function updateAvailability() {
 	const team = $("#order-team").value;
@@ -38,7 +63,10 @@ function updateAvailability() {
 	const currentPeriod = $("#order-period").value;
 	$("#order-period").innerHTML = available.length ? available.map((period) => `<option value="${period}">${periods[period]}</option>`).join("") : '<option value="">Nenhum periodo livre</option>';
 	if (available.includes(currentPeriod)) $("#order-period").value = currentPeriod;
-	$("#availability-message").textContent = available.length ? `${available.length} periodo(s) disponivel(is) para ${team}.` : `${team} ja esta ocupada nos dois periodos desta data.`;
+	const availableTeams = getAvailableTeams(date, $("#order-period").value);
+	const periodOrders = orders.filter((order) => order.date === date && order.period === $("#order-period").value).length;
+	$("#availability-message").textContent = available.length ? `${maxOrdersPerPeriod - periodOrders} vaga(s) restante(s) neste periodo. ${availableTeams.length} equipe(s) livre(s).` : `${team} nao possui periodo livre nesta data.`;
+	$("#available-teams-label").textContent = availableTeams.length ? `Equipes livres neste periodo: ${availableTeams.map((item) => item.name).join(", ")}.` : "Nenhuma equipe livre neste periodo.";
 	checkConflicts();
 }
 function checkConflicts() {
@@ -48,7 +76,9 @@ function checkConflicts() {
 	const period = $("#order-period").value;
 	const conflict = orders.find((order) => order.date === date && order.neighborhood.toLowerCase() === neighborhood && order.team !== team);
 	const occupied = orders.find((order) => order.date === date && order.team === team && order.period === period);
-	const message = conflict ? `Este bairro ja esta reservado para a ${conflict.team} nesta data.` : occupied ? `${team} ja possui uma OS no periodo da ${periods[period]}.` : "";
+	const periodFull = orders.filter((order) => order.date === date && order.period === period).length >= maxOrdersPerPeriod;
+	const slotUnavailable = !period || !getAvailableTeams(date, period).some((item) => item.name === team);
+	const message = conflict ? `Este bairro ja esta reservado para a ${conflict.team} nesta data.` : periodFull ? `Este periodo ja atingiu o limite de ${maxOrdersPerPeriod} ordens de servico.` : occupied ? `${team} ja possui uma OS no periodo da ${periods[period]}.` : slotUnavailable ? "Nao ha vaga valida para esta equipe nesta data." : "";
 	$("#conflict-message").textContent = message;
 	$("#conflict-message").classList.toggle("hidden", !message);
 }
@@ -88,7 +118,7 @@ function showSection(section) {
 	document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.section === section));
 	$("#page-title").textContent = { overview: "Visao geral", orders: "Ordens de servico", teams: "Equipes", history: "Historico" }[section];
 }
-function openModal() { $("#order-modal").classList.remove("hidden"); $("#order-date").value = selectedDate; updateAvailability(); $("#order-number").focus(); }
+function openModal() { $("#order-modal").classList.remove("hidden"); $("#order-date").value = selectedDate; updateDateAvailability(); $("#order-number").focus(); }
 function closeModal() { $("#order-modal").classList.add("hidden"); $("#conflict-message").classList.add("hidden"); }
 
 $("#login-form").addEventListener("submit", (event) => { event.preventDefault(); operator = $("#login-email").value.split("@")[0] || "Operador"; $("#login-view").classList.add("hidden"); $("#app-view").classList.remove("hidden"); $("#user-name").textContent = operator; $("#welcome-name").textContent = operator; $("#user-avatar").textContent = initials(operator); record(`Login realizado por ${operator}`); render(); });
@@ -96,7 +126,7 @@ document.querySelectorAll(".nav-item, [data-section-link]").forEach((button) => 
 $("#new-order-top").addEventListener("click", openModal); $("#new-order-button").addEventListener("click", openModal); $("#close-modal").addEventListener("click", closeModal);
 $("#order-neighborhood").addEventListener("input", checkConflicts);
 $("#order-team").addEventListener("change", updateAvailability);
-$("#order-date").addEventListener("change", updateAvailability);
+$("#order-date").addEventListener("change", updateDateAvailability);
 $("#order-period").addEventListener("change", checkConflicts);
 $("#previous-month").addEventListener("click", () => { calendarDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1); renderCalendar(); });
 $("#next-month").addEventListener("click", () => { calendarDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1); renderCalendar(); });
