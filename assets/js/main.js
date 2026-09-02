@@ -8,11 +8,13 @@ const storageKey = "agendapratanet-orders";
 const historyKey = "agendapratanet-history";
 const periods = { morning: "Manha · 08:00 - 12:00", afternoon: "Tarde · 13:00 - 18:00" };
 const maxOrdersPerPeriod = 3;
+const outsourcedTeam = "Equipe terceirizada";
+const outsourcedTechnicians = ["Gilson", "Willian", "Vinicius"];
 const today = new Date();
 const toISODate = (date) => { const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, "0"); const day = String(date.getDate()).padStart(2, "0"); return `${year}-${month}-${day}`; };
 const formatDate = (date) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(`${date}T12:00:00`));
 const todayISO = toISODate(today);
-let orders = JSON.parse(localStorage.getItem(storageKey) || "[]").map((order) => ({ ...order, client: order.client || "Cliente nao informado", date: order.date || todayISO, period: order.period || (Number((order.time || "08:00").split(":")[0]) >= 13 ? "afternoon" : "morning") }));
+let orders = JSON.parse(localStorage.getItem(storageKey) || "[]").map((order) => ({ ...order, client: order.client || "Cliente nao informado", date: order.date || todayISO, period: order.period || (Number((order.time || "08:00").split(":")[0]) >= 13 ? "afternoon" : "morning"), technician: order.technician || (order.team === outsourcedTeam ? outsourcedTechnicians[0] : "") }));
 let history = JSON.parse(localStorage.getItem(historyKey) || "[]");
 let conflictsAvoided = Number(localStorage.getItem("agendapratanet-conflicts") || "0");
 let operator = "Operador";
@@ -35,7 +37,22 @@ function getAvailablePeriods(team, date) {
 function getAvailableTeams(date, period) {
 	const periodOrders = orders.filter((order) => order.date === date && order.period === period);
 	if (periodOrders.length >= maxOrdersPerPeriod) return [];
-	return teams.filter((team) => !periodOrders.some((order) => order.team === team.name));
+	return teams.filter((team) => team.name === outsourcedTeam ? outsourcedTechnicians.some((technician) => !periodOrders.some((order) => order.team === team.name && order.technician === technician)) : !periodOrders.some((order) => order.team === team.name));
+}
+function getAvailableTechnicians(date, period) {
+	return outsourcedTechnicians.filter((technician) => !orders.some((order) => order.date === date && order.period === period && order.team === outsourcedTeam && order.technician === technician));
+}
+function updateTechnicianField() {
+	const isOutsourced = $("#order-team").value === outsourcedTeam;
+	const field = $("#technician-field");
+	const currentTechnician = $("#order-technician").value;
+	field.classList.toggle("hidden", !isOutsourced);
+	$("#order-technician").required = isOutsourced;
+	if (isOutsourced) {
+		const available = getAvailableTechnicians($("#order-date").value, $("#order-period").value);
+		$("#order-technician").innerHTML = available.length ? available.map((technician) => `<option value="${technician}">${technician}</option>`).join("") : '<option value="">Nenhum tecnico livre</option>';
+		if (available.includes(currentTechnician)) $("#order-technician").value = currentTechnician;
+	}
 }
 function updateDateAvailability() {
 	const date = $("#order-date").value;
@@ -52,6 +69,7 @@ function updateDateAvailability() {
 	const nextTeams = getAvailableTeams(date, nextPeriod);
 	$("#order-team").value = nextTeams[0].name;
 	$("#order-period").value = nextPeriod;
+	updateTechnicianField();
 	$("#next-slot-value").textContent = periods[nextPeriod];
 	$("#available-teams-label").textContent = `Equipes livres: ${nextTeams.map((team) => team.name).join(", ")}.`;
 	updateAvailability();
@@ -63,6 +81,7 @@ function updateAvailability() {
 	const currentPeriod = $("#order-period").value;
 	$("#order-period").innerHTML = available.length ? available.map((period) => `<option value="${period}">${periods[period]}</option>`).join("") : '<option value="">Nenhum periodo livre</option>';
 	if (available.includes(currentPeriod)) $("#order-period").value = currentPeriod;
+	updateTechnicianField();
 	const availableTeams = getAvailableTeams(date, $("#order-period").value);
 	const periodOrders = orders.filter((order) => order.date === date && order.period === $("#order-period").value).length;
 	$("#availability-message").textContent = available.length ? `${maxOrdersPerPeriod - periodOrders} vaga(s) restante(s) neste periodo. ${availableTeams.length} equipe(s) livre(s).` : `${team} nao possui periodo livre nesta data.`;
@@ -75,16 +94,18 @@ function checkConflicts() {
 	const team = $("#order-team").value;
 	const period = $("#order-period").value;
 	const conflict = orders.find((order) => order.date === date && order.neighborhood.toLowerCase() === neighborhood && order.team !== team);
-	const occupied = orders.find((order) => order.date === date && order.team === team && order.period === period);
+	const technician = $("#order-technician").value;
+	const occupied = orders.find((order) => order.date === date && order.team === team && order.period === period && (team !== outsourcedTeam || order.technician === technician));
 	const periodFull = orders.filter((order) => order.date === date && order.period === period).length >= maxOrdersPerPeriod;
-	const slotUnavailable = !period || !getAvailableTeams(date, period).some((item) => item.name === team);
+	const slotUnavailable = !period || !getAvailableTeams(date, period).some((item) => item.name === team) || (team === outsourcedTeam && !getAvailableTechnicians(date, period).includes(technician));
 	const message = conflict ? `Este bairro ja esta reservado para a ${conflict.team} nesta data.` : periodFull ? `Este periodo ja atingiu o limite de ${maxOrdersPerPeriod} ordens de servico.` : occupied ? `${team} ja possui uma OS no periodo da ${periods[period]}.` : slotUnavailable ? "Nao ha vaga valida para esta equipe nesta data." : "";
 	$("#conflict-message").textContent = message;
 	$("#conflict-message").classList.toggle("hidden", !message);
 }
 function orderMarkup(order, table = false) {
-	if (table) return `<div class="order-table-row"><strong>${order.number}</strong><span>${order.type}</span><span>${order.client}</span><span>${order.neighborhood}</span><span>${order.team}</span><span>${periods[order.period] || order.time}</span><span class="status-pill">Agendada</span></div>`;
-	return `<div class="order-row"><div class="team-avatar">${initials(order.team)}</div><div class="order-info"><strong>${order.number} · ${order.client}</strong><small>${order.type} · ${order.neighborhood} · ${order.team}</small></div><span class="order-time">${periods[order.period] || order.time}</span></div>`;
+	const assignment = order.team === outsourcedTeam && order.technician ? `${order.team} · ${order.technician}` : order.team;
+	if (table) return `<div class="order-table-row"><strong>${order.number}</strong><span>${order.type}</span><span>${order.client}</span><span>${order.neighborhood}</span><span>${assignment}</span><span>${periods[order.period] || order.time}</span><span class="status-pill">Agendada</span></div>`;
+	return `<div class="order-row"><div class="team-avatar">${initials(order.technician || order.team)}</div><div class="order-info"><strong>${order.number} · ${order.client}</strong><small>${order.type} · ${order.neighborhood} · ${assignment}</small></div><span class="order-time">${periods[order.period] || order.time}</span></div>`;
 }
 function renderCalendar() {
 	const year = calendarDate.getFullYear();
@@ -125,12 +146,13 @@ $("#login-form").addEventListener("submit", (event) => { event.preventDefault();
 document.querySelectorAll(".nav-item, [data-section-link]").forEach((button) => button.addEventListener("click", () => showSection(button.dataset.section || button.dataset.sectionLink)));
 $("#new-order-top").addEventListener("click", openModal); $("#new-order-button").addEventListener("click", openModal); $("#close-modal").addEventListener("click", closeModal);
 $("#order-neighborhood").addEventListener("input", checkConflicts);
-$("#order-team").addEventListener("change", updateAvailability);
+$("#order-team").addEventListener("change", () => { updateTechnicianField(); updateAvailability(); });
 $("#order-date").addEventListener("change", updateDateAvailability);
-$("#order-period").addEventListener("change", checkConflicts);
+$("#order-period").addEventListener("change", () => { updateTechnicianField(); checkConflicts(); });
+$("#order-technician").addEventListener("change", checkConflicts);
 $("#previous-month").addEventListener("click", () => { calendarDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1); renderCalendar(); });
 $("#next-month").addEventListener("click", () => { calendarDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1); renderCalendar(); });
-$("#order-form").addEventListener("submit", (event) => { event.preventDefault(); checkConflicts(); if (!$("#conflict-message").classList.contains("hidden")) { conflictsAvoided += 1; save(); render(); return; } const order = { number: $("#order-number").value.trim(), type: $("#order-type").value, client: $("#order-client").value.trim(), neighborhood: $("#order-neighborhood").value.trim(), date: $("#order-date").value, team: $("#order-team").value, period: $("#order-period").value }; orders.unshift(order); record(`${order.number} agendada para ${order.client} com ${order.team} em ${order.neighborhood}`); selectedDate = order.date; calendarDate = new Date(`${selectedDate}T12:00:00`); closeModal(); event.target.reset(); render(); showSection("orders"); });
+$("#order-form").addEventListener("submit", (event) => { event.preventDefault(); checkConflicts(); if (!$("#conflict-message").classList.contains("hidden")) { conflictsAvoided += 1; save(); render(); return; } const order = { number: $("#order-number").value.trim(), type: $("#order-type").value, client: $("#order-client").value.trim(), neighborhood: $("#order-neighborhood").value.trim(), date: $("#order-date").value, team: $("#order-team").value, technician: $("#order-team").value === outsourcedTeam ? $("#order-technician").value : "", period: $("#order-period").value }; orders.unshift(order); record(`${order.number} agendada para ${order.client} com ${order.technician || order.team} em ${order.neighborhood}`); selectedDate = order.date; calendarDate = new Date(`${selectedDate}T12:00:00`); closeModal(); event.target.reset(); $("#technician-field").classList.add("hidden"); render(); showSection("orders"); });
 const logout = () => { $("#app-view").classList.add("hidden"); $("#login-view").classList.remove("hidden"); }; $("#logout-button").addEventListener("click", logout); $("#header-logout").addEventListener("click", logout);
 $("#today-label").textContent = formatDate(todayISO);
 renderTeams(); render();
