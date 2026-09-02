@@ -2,7 +2,7 @@
 
 Agenda operacional para organizar ordens de servico, equipes e bairros atendidos pela PrataNet.
 
-![Tela inicial da AgendaPrataNet](assets/images/tela-inicial.png)
+![Tela inicial da AgendaPrataNet](assets/images/fotoreadme.png)
 
 ## Sobre o projeto
 
@@ -54,6 +54,7 @@ projetoagendapratanet/
     ├── images/
     │   ├── logomarca_pratanet_2021_icone.png
     │   ├── logopaginadelogin.png
+    │   ├── fotoreadme.png
     │   └── tela-inicial.png
     └── js/
         └── main.js
