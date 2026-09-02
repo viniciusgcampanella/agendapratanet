@@ -7,10 +7,63 @@
     <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
+    <div id="login-view" class="login-shell">
+        <section class="login-visual">
+            <div class="brand-mark">AP</div>
+            <p class="eyebrow">Operacao inteligente</p>
+            <h1>AgendaPrata<span>Net</span></h1>
+            <p class="login-description">Distribua equipes com clareza e evite deslocamentos desnecessarios.</p>
+            <div class="visual-note"><span class="status-dot"></span> Agenda sincronizada localmente</div>
+        </section>
+        <section class="login-panel">
+            <div class="login-card">
+                <p class="eyebrow">Acesso restrito</p>
+                <h2>Bem-vindo de volta</h2>
+                <p class="muted">Entre para acessar a agenda operacional.</p>
+                <form id="login-form" class="stack-form">
+                    <label for="login-email">E-mail corporativo</label>
+                    <input id="login-email" type="email" placeholder="voce@pratanet.com.br" required>
+                    <label for="login-password">Senha</label>
+                    <input id="login-password" type="password" placeholder="Digite sua senha" required minlength="4">
+                    <button class="primary-button" type="submit">Entrar no painel <span aria-hidden="true">&#8594;</span></button>
+                </form>
+                <p class="form-hint">Modo demonstracao: qualquer e-mail e senha com 4 caracteres.</p>
+            </div>
+        </section>
+    </div>
 
-    <p>
-        Bem-vindo à AgendaPrataNet!
-    </p>
+    <div id="app-view" class="app-shell hidden">
+        <aside class="sidebar">
+            <div class="sidebar-brand"><div class="brand-mark small">AP</div><strong>AgendaPrata<span>Net</span></strong></div>
+            <div class="side-label">Workspace</div>
+            <nav>
+                <button class="nav-item active" data-section="overview"><span class="nav-icon">&#9632;</span> Visao geral</button>
+                <button class="nav-item" data-section="orders"><span class="nav-icon">&#9776;</span> Ordens de servico</button>
+                <button class="nav-item" data-section="teams"><span class="nav-icon">&#9673;</span> Equipes</button>
+                <button class="nav-item" data-section="history"><span class="nav-icon">&#8634;</span> Historico</button>
+            </nav>
+            <div class="sidebar-footer"><div class="help-box"><strong>Precisa de ajuda?</strong><span>Consulte a operacao antes de agendar.</span></div><button id="logout-button" class="logout-button">Sair da conta</button></div>
+        </aside>
+
+        <main class="main-content">
+            <header class="topbar"><div><p class="eyebrow">Quarta-feira, 02 de setembro de 2026</p><h2 id="page-title">Visao geral</h2></div><div class="user-menu"><div class="avatar" id="user-avatar">OP</div><div><strong id="user-name">Operador</strong><span>Administrador</span></div><button id="header-logout" aria-label="Sair">&#8942;</button></div></header>
+
+            <section id="overview-section" class="page-section">
+                <div class="welcome-row"><div><h1>Bom trabalho, <span id="welcome-name">operador</span>.</h1><p class="muted">Aqui esta o retrato da operacao de hoje.</p></div><button class="primary-button compact" id="new-order-top">+ Nova ordem</button></div>
+                <div class="stats-grid"><article class="stat-card accent"><div class="stat-top"><span>Ordens hoje</span><span class="stat-symbol">&#9632;</span></div><strong id="orders-count">0</strong><small>Agendadas para hoje</small></article><article class="stat-card"><div class="stat-top"><span>Equipes em campo</span><span class="stat-symbol green">&#9673;</span></div><strong id="teams-count">0</strong><small>Disponiveis na operacao</small></article><article class="stat-card"><div class="stat-top"><span>Bairros ocupados</span><span class="stat-symbol orange">&#9678;</span></div><strong id="neighborhoods-count">0</strong><small>Com cobertura planejada</small></article><article class="stat-card"><div class="stat-top"><span>Conflitos evitados</span><span class="stat-symbol purple">&#10003;</span></div><strong id="conflicts-count">0</strong><small>Bloqueios automaticos</small></article></div>
+                <div class="content-grid"><section class="panel team-panel"><div class="panel-heading"><div><p class="eyebrow">Disponibilidade</p><h3>Equipes na operacao</h3></div><button class="text-button" data-section-link="teams">Ver todas &#8594;</button></div><div id="team-list" class="team-list"></div></section><section class="panel agenda-panel"><div class="panel-heading"><div><p class="eyebrow">Programacao</p><h3>Ordens recentes</h3></div><button class="text-button" data-section-link="orders">Ver agenda &#8594;</button></div><div id="recent-orders" class="recent-orders"></div></section></div>
+            </section>
+
+            <section id="orders-section" class="page-section hidden"><div class="section-heading"><div><p class="eyebrow">Planejamento</p><h1>Ordens de servico</h1><p class="muted">Agende uma visita e mantenha os bairros sem sobreposicao.</p></div><button class="primary-button compact" id="new-order-button">+ Nova ordem</button></div><div class="panel"><div id="orders-table" class="orders-table"></div></div></section>
+
+            <section id="teams-section" class="page-section hidden"><div class="section-heading"><div><p class="eyebrow">Recursos</p><h1>Equipes</h1><p class="muted">Acompanhe quem esta disponivel para atendimento.</p></div></div><div id="all-team-cards" class="all-team-cards"></div></section>
+
+            <section id="history-section" class="page-section hidden"><div class="section-heading"><div><p class="eyebrow">Rastreabilidade</p><h1>Historico de alteracoes</h1><p class="muted">Cada agendamento fica registrado para consulta.</p></div></div><div class="panel"><div id="history-list" class="history-list"></div></div></section>
+        </main>
+    </div>
+
+    <div id="order-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-card"><button class="close-button" id="close-modal" aria-label="Fechar">&times;</button><p class="eyebrow">Nova programacao</p><h2 id="modal-title">Criar ordem de servico</h2><p class="muted">A agenda bloqueia automaticamente bairros ja ocupados.</p><form id="order-form" class="order-form"><label for="order-number">Numero da OS</label><input id="order-number" placeholder="Ex: OS-2048" required><label for="order-type">Tipo de ordem</label><select id="order-type"><option>Instalacao</option><option>Manutencao</option><option>Retirada</option><option>Vistoria</option></select><label for="order-neighborhood">Bairro</label><input id="order-neighborhood" placeholder="Ex: Centro" required><label for="order-team">Equipe responsavel</label><select id="order-team"></select><label for="order-time">Horario</label><input id="order-time" type="time" value="08:00" required><div id="conflict-message" class="conflict-message hidden"></div><button class="primary-button" type="submit">Adicionar a agenda</button></form></div></div>
+
     <script src="assets/js/main.js"></script>
 </body>
 </html>
